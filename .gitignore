@@ -1,0 +1,14 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Build-time vendored artifacts (populated by hatch_build.py, not tracked)
+src/simai/_vendor/
+src/simai/_binaries/

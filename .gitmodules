@@ -1,0 +1,3 @@
+[submodule "vendor/simai"]
+	path = vendor/simai
+	url = https://github.com/aliyun/SimAI.git

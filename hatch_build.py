@@ -1,0 +1,62 @@
+"""Custom Hatch build hook for SimAI.
+
+Vendors AICB Python code and pre-built binaries into the wheel.
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+from pathlib import Path
+
+from hatchling.builders.hooks.plugin.interface import BuildHookInterface
+
+
+class CustomBuildHook(BuildHookInterface):
+    PLUGIN_NAME = "custom"
+
+    def initialize(self, version: str, build_data: dict) -> None:
+        """Vendor AICB code and binaries into the source tree before building."""
+        src_root = Path(self.root) / "src" / "simai"
+
+        # --- Vendor AICB Python code ---
+        aicb_src = Path(self.root) / "vendor" / "simai" / "aicb"
+        aicb_dest = src_root / "_vendor" / "aicb"
+
+        if aicb_src.is_dir():
+            if aicb_dest.exists():
+                shutil.rmtree(aicb_dest)
+            # Copy the required subdirectories
+            aicb_dest.mkdir(parents=True, exist_ok=True)
+            for subdir in ("workload_generator", "utils", "log_analyzer", "training"):
+                src = aicb_src / subdir
+                if src.is_dir():
+                    shutil.copytree(src, aicb_dest / subdir, dirs_exist_ok=True)
+
+        # --- Include pre-built binaries ---
+        bin_dir = Path(self.root) / "build" / "bin"
+        bin_dest = src_root / "_binaries"
+
+        if bin_dir.is_dir():
+            if bin_dest.exists():
+                shutil.rmtree(bin_dest)
+            bin_dest.mkdir(parents=True, exist_ok=True)
+            for binary in bin_dir.iterdir():
+                if binary.is_file():
+                    dest = bin_dest / binary.name
+                    shutil.copy2(binary, dest)
+                    # Ensure executable
+                    dest.chmod(dest.stat().st_mode | 0o111)
+
+        # --- Set platform tag if specified ---
+        platform_tag = os.environ.get("SIMAI_PLATFORM_TAG")
+        if platform_tag:
+            build_data["tag"] = f"py3-none-{platform_tag}"
+
+    def finalize(self, version: str, build_data: dict, artifact_path: str) -> None:
+        """Clean up vendored files after build."""
+        src_root = Path(self.root) / "src" / "simai"
+        for dirname in ("_vendor", "_binaries"):
+            vendored = src_root / dirname
+            if vendored.exists():
+                shutil.rmtree(vendored)
