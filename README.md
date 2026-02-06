@@ -4,11 +4,13 @@ Python wrapper for the [SimAI](https://github.com/aliyun/SimAI) datacenter netwo
 
 ## Installation
 
-Download the latest wheel from [GitHub Releases](https://github.com/tiberiuiancu/simai/releases):
+Install the latest wheel from [GitHub Releases](https://github.com/tiberiuiancu/SimAI/releases):
 
 ```bash
-pip install https://github.com/tiberiuiancu/simai/releases/download/v0.2.0/simai-0.2.0-py3-none-manylinux_2_35_x86_64.whl
+pip install simai@"https://github.com/tiberiuiancu/SimAI/releases/download/VERSION/simai-VERSION-py3-none-manylinux_2_35_x86_64.whl"
 ```
+
+Replace `VERSION` with the desired release version (e.g. `v0.2.7` in the URL path and `0.2.7` in the filename).
 
 For GPU compute profiling (optional, requires CUDA):
 
@@ -29,6 +31,7 @@ simai generate workload \
     --num-layers 32 \
     --hidden-size 4096 \
     --sequence-length 2048 \
+    --iter 10 \
     -o workload.txt
 ```
 
@@ -59,13 +62,42 @@ simai simulate ns3 \
     -o results/
 ```
 
+## Output files
+
+### Analytical backend
+
+Produces CSV result files in the output directory:
+
+- **`<prefix>_EndToEnd.csv`** — Main results file. Contains a summary row with total simulated training iteration time and per-parallelism-dimension communication breakdown (DP, TP, EP, PP), followed by per-layer rows with forward/weight-gradient/input-gradient comm times and algorithm/bus bandwidth.
+
+### NS-3 backend
+
+Produces several files in the output directory:
+
+- **`ncclFlowModel_EndToEnd.csv`** — Main results file. Same format as the analytical output: summary row with total time and communication breakdown, then per-layer detail with exposed comm times and bandwidth.
+- **`ncclFlowModel_*_dimension_utilization_*.csv`** — Time-series of network dimension utilization (sampled every 10us). Useful for spotting congestion patterns.
+- **`*_fct.txt`** — Flow Completion Times. Each row is a completed network flow with source, destination, port, priority, size, start time, FCT, and end time.
+- **`*_pfc.txt`** — Priority Flow Control events. Empty means no PFC pauses occurred (no congestion-induced backpressure).
+- **`*_mix.tr`** — Binary NS-3 trace file.
+- **`ncclFlowModel_detailed_*.csv`** — Detailed per-chunk communication breakdown (may be empty for small workloads).
+
+## Differences from upstream SimAI
+
+This wrapper automates the manual setup that upstream SimAI requires:
+
+- **Output location**: Upstream writes to hardcoded paths (`./results/` for analytical, `/etc/astra-sim/simulation/` for NS-3 config paths). This wrapper runs binaries in isolated temp directories and moves results to the user-specified `-o` path.
+- **Directory setup**: Upstream requires manually creating directory structures and symlinking data files (e.g. `astra-sim-alibabacloud/inputs/ratio/` CSVs). This wrapper handles it automatically.
+- **Config patching**: The NS-3 config file (`SimAI.conf`) hardcodes absolute paths to `/etc/astra-sim/simulation/`. This wrapper patches them at runtime to point to the temp directory.
+- **Binary and data discovery**: Upstream requires users to manage paths to binaries and auxiliary data. This wrapper auto-discovers them from the wheel's bundled files, environment variables (`SIMAI_BIN_PATH`, `SIMAI_PATH`), or the vendor submodule.
+- **Topology directory**: Upstream passes raw bandwidth parameters to the analytical backend and a topology file path to NS-3 separately. This wrapper uses a unified topology directory (containing `topology` file + `metadata.json`) for both backends.
+
 ## Building from source
 
 Requires the SimAI submodule and compiled binaries:
 
 ```bash
-git clone --recurse-submodules https://github.com/tiberiuiancu/simai.git
-cd simai
+git clone --recurse-submodules https://github.com/tiberiuiancu/SimAI.git
+cd SimAI
 
 # Build binaries (see vendor/simai/scripts/build.sh)
 # Place SimAI_analytical and SimAI_simulator in build/bin/
