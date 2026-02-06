@@ -97,14 +97,12 @@ jobs:
         id: cache-ns3
         uses: actions/cache@v4
         with:
-          path: |
-            vendor/simai/astra-sim-alibabacloud/extern/network_backend/ns3-interface/simulation/build/scratch/ns3.36.1-AstraSimNetwork-debug
-            vendor/simai/astra-sim-alibabacloud/extern/network_backend/ns3-interface/simulation/build/lib/libns3*
+          path: build/ns3-deps
           key: ns3-${{ steps.submodule-hash.outputs.hash }}
 
       - name: Install build dependencies
         if: steps.cache-ns3.outputs.cache-hit != 'true'
-        run: sudo apt-get update && sudo apt-get install -y gcc g++ cmake make libxml2-dev libsqlite3-dev
+        run: sudo apt-get update && sudo apt-get install -y gcc g++ cmake make libxml2-dev libsqlite3-dev libgsl-dev
 
       - name: Copy ns3 source into extern dir
         if: steps.cache-ns3.outputs.cache-hit != 'true'
@@ -132,13 +130,39 @@ jobs:
           ./ns3 configure -d debug --enable-mtp
           ./ns3 build
 
+      - name: Collect runtime shared library dependencies
+        if: steps.cache-ns3.outputs.cache-hit != 'true'
+        run: |
+          NS3_BIN=vendor/simai/astra-sim-alibabacloud/extern/network_backend/ns3-interface/simulation/build/scratch/ns3.36.1-AstraSimNetwork-debug
+          NS3_LIBS=vendor/simai/astra-sim-alibabacloud/extern/network_backend/ns3-interface/simulation/build/lib
+          mkdir -p build/ns3-deps
+          # Copy ns3 binary and its own libs
+          cp "$NS3_BIN" build/ns3-deps/
+          cp "$NS3_LIBS"/libns3* build/ns3-deps/ 2>/dev/null || true
+          # Copy non-standard system library dependencies (skip libc, libm, libpthread, ld-linux, etc.)
+          for lib in $(ldd "$NS3_BIN" 2>/dev/null | grep -oP '/\S+\.so[.\d]*' | sort -u); do
+            case "$(basename "$lib")" in
+              libc.so*|libm.so*|libpthread.so*|libdl.so*|librt.so*|ld-linux*|libstdc++*|libgcc_s*) continue ;;
+            esac
+            cp -L "$lib" build/ns3-deps/ 2>/dev/null || true
+          done
+          # Also check the ns3 shared libs for transitive deps
+          for so in build/ns3-deps/libns3*; do
+            for lib in $(ldd "$so" 2>/dev/null | grep -oP '/\S+\.so[.\d]*' | sort -u); do
+              case "$(basename "$lib")" in
+                libc.so*|libm.so*|libpthread.so*|libdl.so*|librt.so*|ld-linux*|libstdc++*|libgcc_s*) continue ;;
+              esac
+              cp -nL "$lib" build/ns3-deps/ 2>/dev/null || true
+            done
+          done
+          echo "Bundled libraries:"
+          ls -la build/ns3-deps/
+
       - name: Upload ns3 binary and shared libraries
         uses: actions/upload-artifact@v4
         with:
           name: SimAI_simulator
-          path: |
-            vendor/simai/astra-sim-alibabacloud/extern/network_backend/ns3-interface/simulation/build/scratch/ns3.36.1-AstraSimNetwork-debug
-            vendor/simai/astra-sim-alibabacloud/extern/network_backend/ns3-interface/simulation/build/lib/libns3*
+          path: build/ns3-deps/
 
   build-wheel:
     runs-on: ubuntu-latest
@@ -158,14 +182,11 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: SimAI_simulator
-          path: build/ns3-artifact
+          path: build/bin
 
       - name: Prepare binaries
         run: |
-          # Flatten ns3 artifact: binary + shared libraries into build/bin/
-          find build/ns3-artifact -name 'ns3.36.1-AstraSimNetwork-debug' -exec mv {} build/bin/SimAI_simulator \;
-          find build/ns3-artifact -name 'libns3*' -exec mv {} build/bin/ \;
-          rm -rf build/ns3-artifact
+          mv build/bin/ns3.36.1-AstraSimNetwork-debug build/bin/SimAI_simulator
           chmod +x build/bin/*
 
       - name: Install uv
