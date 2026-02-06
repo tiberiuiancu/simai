@@ -74,6 +74,15 @@ class CustomBuildHook(BuildHookInterface):
                     # Ensure executable
                     dest.chmod(dest.stat().st_mode | 0o111)
 
+        # --- Force-include dynamically created directories ---
+        # Hatchling uses git to decide what goes in the wheel, so files
+        # created by this hook are excluded by default.
+        force_include = build_data.setdefault("force_include", {})
+        if (src_root / "_vendor").is_dir():
+            force_include[str(src_root / "_vendor")] = "simai/_vendor"
+        if (src_root / "_binaries").is_dir():
+            force_include[str(src_root / "_binaries")] = "simai/_binaries"
+
         # --- Set platform tag if specified ---
         platform_tag = os.environ.get("SIMAI_PLATFORM_TAG")
         if platform_tag:
