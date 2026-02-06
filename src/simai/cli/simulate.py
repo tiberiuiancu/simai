@@ -35,7 +35,6 @@ def _parse_workload_gpu_count(workload: Path) -> int | None:
     return None
 
 
-
 @app.command()
 def analytical(
     workload: Annotated[
@@ -48,7 +47,7 @@ def analytical(
     ],
     output: Annotated[
         Optional[Path],
-        typer.Option("--output", "-o", help="Output directory for result CSV files (default: ./results/)."),
+        typer.Option("--output", "-o", help="Output path for results (file or directory)."),
     ] = None,
     dp_overlap: Annotated[
         Optional[float],
@@ -70,6 +69,10 @@ def analytical(
         Optional[str],
         typer.Option("--result-prefix", help="Prefix for result file names."),
     ] = None,
+    verbose: Annotated[
+        bool,
+        typer.Option("--verbose", "-v", help="Show binary output."),
+    ] = False,
 ):
     """Run the analytical (fast, approximate) network simulation."""
     from simai.backends.analytical import run_analytical
@@ -96,6 +99,7 @@ def analytical(
         pp_overlap=pp_overlap,
         result_prefix=result_prefix,
         output=output,
+        verbose=verbose,
     )
 
 
@@ -131,8 +135,12 @@ def ns3(
     ] = False,
     output: Annotated[
         Optional[Path],
-        typer.Option("--output", "-o", help="Output directory for results."),
+        typer.Option("--output", "-o", help="Output path for results (file or directory)."),
     ] = None,
+    verbose: Annotated[
+        bool,
+        typer.Option("--verbose", "-v", help="Show binary output."),
+    ] = False,
 ):
     """Run the NS-3 (detailed, packet-level) network simulation."""
     from simai.backends.ns3 import run_ns3
@@ -156,4 +164,5 @@ def ns3(
         nvls=nvls,
         pxn=pxn,
         output=output,
+        verbose=verbose,
     )

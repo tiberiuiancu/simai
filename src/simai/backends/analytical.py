@@ -62,6 +62,7 @@ def run_analytical(
     pp_overlap: float | None = None,
     result_prefix: str | None = None,
     output: Path | None = None,
+    verbose: bool = False,
 ) -> Path:
     """Run the SimAI analytical backend.
 
@@ -105,9 +106,8 @@ def run_analytical(
         result_prefix = workload.stem
     args += ["-r", result_prefix]
 
-    # Determine output directory
-    output_dir = Path(output) if output else Path("results")
-    output_dir = output_dir.resolve()
+    # Determine output path
+    output_path = Path(output).resolve() if output else Path("results").resolve()
 
     # Run from a temp directory
     with tempfile.TemporaryDirectory(prefix="simai_analytical_") as tmpdir:
@@ -123,22 +123,39 @@ def run_analytical(
             if astrasim_src.is_dir():
                 os.symlink(astrasim_src, tmppath / "astra-sim-alibabacloud")
 
-        run_binary(BINARY_NAME, args, cwd=tmpdir)
+        run_binary(BINARY_NAME, args, cwd=tmpdir, verbose=verbose)
 
-        # Move results from tmpdir/results/ to output_dir
+        # Collect generated result files
         tmp_results = tmppath / "results"
-        if tmp_results.is_dir() and any(tmp_results.iterdir()):
-            output_dir.mkdir(parents=True, exist_ok=True)
-            for item in tmp_results.iterdir():
-                dest = output_dir / item.name
+        result_files = list(tmp_results.iterdir()) if tmp_results.is_dir() else []
+
+        if not result_files:
+            print(f"Warning: no result files found in {tmp_results}")
+            return output_path
+
+        # If output looks like a file path (has extension or doesn't exist as dir),
+        # and there's a single result, save as that filename.
+        if output_path.suffix and not output_path.is_dir():
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            # Move the primary result (EndToEnd.csv) to the specified path
+            primary = next((f for f in result_files if "EndToEnd" in f.name), result_files[0])
+            shutil.move(str(primary), str(output_path))
+            # Move any remaining files alongside it
+            for item in result_files:
+                if item.exists():
+                    shutil.move(str(item), str(output_path.parent / item.name))
+            print(f"Results saved to: {output_path}")
+        else:
+            # Treat as directory
+            output_path.mkdir(parents=True, exist_ok=True)
+            for item in result_files:
+                dest = output_path / item.name
                 if dest.exists():
                     if dest.is_dir():
                         shutil.rmtree(dest)
                     else:
                         dest.unlink()
                 shutil.move(str(item), str(dest))
-            print(f"Results saved to: {output_dir}")
-        else:
-            print(f"Warning: no result files found in {tmp_results}")
+            print(f"Results saved to: {output_path}")
 
-    return output_dir
+    return output_path

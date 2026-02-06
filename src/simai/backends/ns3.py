@@ -39,6 +39,7 @@ def run_ns3(
     nvls: bool = False,
     pxn: bool = False,
     output: Path | None = None,
+    verbose: bool = False,
 ) -> Path:
     """Run the SimAI NS-3 simulator backend.
 
@@ -71,24 +72,39 @@ def run_ns3(
     if pxn:
         env["AS_PXN_ENABLE"] = "1"
 
-    # Determine output directory
-    output_dir = Path(output) if output else Path("results")
-    output_dir = output_dir.resolve()
+    # Determine output path
+    output_path = Path(output).resolve() if output else Path("results").resolve()
 
     # Run from a temp directory to capture output
     with tempfile.TemporaryDirectory(prefix="simai_ns3_") as tmpdir:
-        run_binary(BINARY_NAME, args, cwd=tmpdir, env=env)
+        run_binary(BINARY_NAME, args, cwd=tmpdir, env=env, verbose=verbose)
 
-        # Move all generated files to output_dir
-        output_dir.mkdir(parents=True, exist_ok=True)
-        for item in Path(tmpdir).iterdir():
-            dest = output_dir / item.name
-            if dest.exists():
-                if dest.is_dir():
-                    shutil.rmtree(dest)
-                else:
-                    dest.unlink()
-            shutil.move(str(item), str(dest))
-        print(f"Results saved to: {output_dir}")
+        result_files = list(Path(tmpdir).iterdir())
 
-    return output_dir
+        if not result_files:
+            print("Warning: no result files generated")
+            return output_path
+
+        # If output looks like a file path (has extension or doesn't exist as dir),
+        # and there's a single result, save as that filename.
+        if output_path.suffix and not output_path.is_dir():
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            primary = result_files[0]
+            shutil.move(str(primary), str(output_path))
+            for item in result_files:
+                if item.exists():
+                    shutil.move(str(item), str(output_path.parent / item.name))
+            print(f"Results saved to: {output_path}")
+        else:
+            output_path.mkdir(parents=True, exist_ok=True)
+            for item in result_files:
+                dest = output_path / item.name
+                if dest.exists():
+                    if dest.is_dir():
+                        shutil.rmtree(dest)
+                    else:
+                        dest.unlink()
+                shutil.move(str(item), str(dest))
+            print(f"Results saved to: {output_path}")
+
+    return output_path

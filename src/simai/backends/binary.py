@@ -45,8 +45,9 @@ def run_binary(
     *,
     cwd: Path | str | None = None,
     env: dict[str, str] | None = None,
+    verbose: bool = False,
 ) -> subprocess.CompletedProcess[str]:
-    """Find and run a SimAI binary, streaming output to the terminal."""
+    """Find and run a SimAI binary."""
     binary = find_binary(name)
     cmd = [str(binary)] + args
 
@@ -59,4 +60,6 @@ def run_binary(
         cwd=cwd,
         env=run_env,
         check=True,
+        stdout=None if verbose else subprocess.DEVNULL,
+        stderr=None if verbose else subprocess.DEVNULL,
     )
