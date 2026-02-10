@@ -98,7 +98,7 @@ def run_ns3(
             conf_text = f.read()
         conf_text = re.sub(
             r"/etc/astra-sim/simulation/",
-            tmpdir.rstrip("/") + "/"
+            tmpdir.rstrip("/") + "/",
             conf_text,
         )
         with open(patched_config, "w") as f:
