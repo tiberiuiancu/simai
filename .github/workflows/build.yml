@@ -132,11 +132,11 @@ jobs:
             ./ns3 build
 
             # Strip binaries to reduce size
-            strip build/scratch/ns3.36.1-AstraSimNetwork-release 2>/dev/null || true
+            strip build/scratch/ns3.36.1-AstraSimNetwork 2>/dev/null || true
             strip build/lib/libns3*.so 2>/dev/null || true
 
             # Collect dependencies
-            NS3_BIN=build/scratch/ns3.36.1-AstraSimNetwork-release
+            NS3_BIN=build/scratch/ns3.36.1-AstraSimNetwork
             NS3_LIBS=build/lib
             mkdir -p /workspace/build/ns3-deps
             cp "$NS3_BIN" /workspace/build/ns3-deps/
@@ -190,7 +190,7 @@ jobs:
 
       - name: Prepare binaries
         run: |
-          mv build/bin/ns3.36.1-AstraSimNetwork-release build/bin/SimAI_simulator
+          mv build/bin/ns3.36.1-AstraSimNetwork build/bin/SimAI_simulator
           chmod +x build/bin/*
           # Strip analytical binary too
           strip build/bin/SimAI_analytical 2>/dev/null || true
