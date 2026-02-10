@@ -66,12 +66,8 @@ jobs:
       - name: Install build dependencies
         if: steps.cache-analytical.outputs.cache-hit != 'true'
         run: |
-          if command -v yum &> /dev/null; then
-            yum install -y gcc gcc-c++ cmake3 make
-            ln -sf /usr/bin/cmake3 /usr/bin/cmake || true
-          elif command -v apt-get &> /dev/null; then
-            apt-get update && apt-get install -y gcc g++ cmake make
-          fi
+          yum install -y gcc gcc-c++ cmake3 make
+          ln -sf /usr/bin/cmake3 /usr/bin/cmake || true
 
       - name: Build SimAI_analytical
         if: steps.cache-analytical.outputs.cache-hit != 'true'
@@ -90,7 +86,7 @@ jobs:
   build-ns3:
     needs: check-version
     if: needs.check-version.outputs.changed == 'true' || inputs.force == true
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
@@ -98,8 +94,6 @@ jobs:
             container: quay.io/pypa/manylinux2014_x86_64
           - manylinux_tag: manylinux_2_28_x86_64
             container: quay.io/pypa/manylinux_2_28_x86_64
-          - manylinux_tag: manylinux_2_35_x86_64
-            container: null
     container: ${{ matrix.container }}
     steps:
       - uses: actions/checkout@v4
@@ -120,12 +114,8 @@ jobs:
       - name: Install build dependencies
         if: steps.cache-ns3.outputs.cache-hit != 'true'
         run: |
-          if command -v yum &> /dev/null; then
-            yum install -y gcc gcc-c++ cmake3 make libxml2-devel sqlite-devel gsl-devel
-            ln -sf /usr/bin/cmake3 /usr/bin/cmake || true
-          elif command -v apt-get &> /dev/null; then
-            apt-get update && apt-get install -y gcc g++ cmake make libxml2-dev libsqlite3-dev libgsl-dev
-          fi
+          yum install -y gcc gcc-c++ cmake3 make libxml2-devel sqlite-devel gsl-devel
+          ln -sf /usr/bin/cmake3 /usr/bin/cmake || true
 
       - name: Copy ns3 source into extern dir
         if: steps.cache-ns3.outputs.cache-hit != 'true'
@@ -192,7 +182,7 @@ jobs:
     needs: [check-version, build-analytical, build-ns3]
     strategy:
       matrix:
-        manylinux_tag: [manylinux_2_17_x86_64, manylinux_2_28_x86_64, manylinux_2_35_x86_64]
+        manylinux_tag: [manylinux_2_17_x86_64, manylinux_2_28_x86_64]
     steps:
       - uses: actions/checkout@v4
         with:
