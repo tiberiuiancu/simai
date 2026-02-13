@@ -196,7 +196,7 @@ jobs:
         id: cache-m4
         uses: actions/cache@v4
         with:
-          path: vendor/simai-m4/astra-sim-alibabacloud/build/simai_m4/build/SimAI_m4/SimAI_m4
+          path: vendor/simai-m4/astra-sim-alibabacloud/build/simai_m4/build/simai_m4/SimAI_m4
           key: m4-ubuntu22-${{ steps.submodule-hash.outputs.hash }}
 
       - name: Install build dependencies
@@ -216,7 +216,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SimAI_m4
-          path: vendor/simai-m4/astra-sim-alibabacloud/build/simai_m4/build/SimAI_m4/SimAI_m4
+          path: vendor/simai-m4/astra-sim-alibabacloud/build/simai_m4/build/simai_m4/SimAI_m4
 
   build-wheel:
     runs-on: ubuntu-latest
