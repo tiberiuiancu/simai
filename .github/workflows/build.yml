@@ -189,7 +189,7 @@ jobs:
 
   build-m4:
     needs: check-version
-    if: needs.check-version.outputs.changed == 'true' || inputs.force == true
+    if: needs.check-version.outputs.changed == 'true' || inputs.force == true || needs.check-version.outputs.is_dev == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

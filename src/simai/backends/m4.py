@@ -72,8 +72,10 @@ def _convert_topology(src: Path, dst: Path) -> None:
 
     Converts bandwidth from raw bps integers to XGbps strings, and
     latency from plain float seconds to Xms strings.
+    If the values already carry units (e.g. '7200Gbps', '0.025ms'), they are
+    passed through unchanged.
 
-    Format (lines 3+): src_node dst_node bw_bps latency_sec err_rate
+    Format (lines 3+): src_node dst_node bw_bps_or_Gbps latency_sec_or_ms err_rate
     """
     with open(src) as f:
         lines = f.readlines()
@@ -89,10 +91,19 @@ def _convert_topology(src: Path, dst: Path) -> None:
                 f.write(line)
                 continue
             src_node, dst_node = parts[0], parts[1]
-            bw_gbps = float(parts[2]) / 1e9
-            latency_ms = float(parts[3]) * 1e3
-            err_rate = parts[4]
-            f.write(f"{src_node} {dst_node} {bw_gbps:g}Gbps {latency_ms:g}ms {err_rate}\n")
+            bw_raw, lat_raw, err_rate = parts[2], parts[3], parts[4]
+
+            if bw_raw.lower().endswith("gbps"):
+                bw_out = bw_raw
+            else:
+                bw_out = f"{float(bw_raw) / 1e9:g}Gbps"
+
+            if lat_raw.lower().endswith("ms"):
+                lat_out = lat_raw
+            else:
+                lat_out = f"{float(lat_raw) * 1e3:g}ms"
+
+            f.write(f"{src_node} {dst_node} {bw_out} {lat_out} {err_rate}\n")
 
 
 def run_m4(

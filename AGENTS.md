@@ -30,7 +30,7 @@ AI training workload analysis. It provides:
 - **CLI**: `simai generate workload/topology`, `simai profile gpu`, `simai simulate analytical/ns3`
 - **Workload generation**: From ML framework configs (Megatron, DeepSpeed, DeepSeek)
 - **Topology generation**: For Spectrum-X, DCN+, AlibabaHPN datacenter architectures
-- **Two simulation backends**: Analytical (fast, bandwidth-based) and NS-3 (detailed, packet-level)
+- **Three simulation backends**: Analytical (fast, bandwidth-based), NS-3 (detailed, packet-level), and M4 (flow-level, ML-based gray failure)
 - **GPU profiling**: Measure actual kernel execution times for realistic simulations
 
 The wrapper abstracts complex manual setup from upstream SimAI (hardcoded paths, directory
@@ -164,6 +164,12 @@ For editable installs, resource discovery falls back to the `vendor/simai/` subm
 - Creates dummy `flow1.txt`, `trace1.txt` inputs
 - Sets env vars for log level, NVLS, PXN flags
 
+**`m4.py`** - `run_m4()`:
+- `_find_m4_models()`: Locates bundled `.pt` model files (3-tier: `_vendor/m4_models/` → editable vendor path → `SIMAI_PATH`)
+- `_find_libtorch_lib_dir()`: Returns the torch lib dir for setting `LD_LIBRARY_PATH` at runtime
+- `_convert_topology()`: Converts topology file to m4 format (bandwidth → XGbps, latency → Xms). Handles both raw numeric values and pre-formatted unit strings (e.g. `7200Gbps`, `0.000025ms`)
+- Symlinks model files to the path the binary hardcodes relative to cwd, runs in a temp dir
+
 ---
 
 ## Vendor Components
@@ -238,11 +244,18 @@ Mirrors the CI pipeline. Builds missing binaries then calls `uv build --wheel`.
 rm -rf build/bin && ./scripts/build_wheel.sh --docker
 ```
 
-Binary detection: if `build/bin/SimAI_analytical` **and** `build/bin/SimAI_simulator` both
-exist the binary build is skipped automatically (no flag needed).
+Binary detection: if `build/bin/SimAI_analytical`, `build/bin/SimAI_simulator`, **and**
+`build/bin/SimAI_m4` all exist the binary build is skipped automatically (no flag needed).
+Missing binaries are built individually — e.g. only `SimAI_m4` missing only triggers `build_m4()`.
 
-Build tool priority: Docker (`quay.io/pypa/manylinux2014_x86_64`) if available, then native
-`cmake`/`make`.
+Build tool priority for analytical+ns3: Docker (`quay.io/pypa/manylinux2014_x86_64`) if
+available, then native `cmake`/`make`.
+
+**m4 binary is always built natively** (not inside Docker). It downloads CPU-only LibTorch
+2.2.2 to `build/libtorch/` (cached after first download) and sets `LIBTORCH_DIR` before
+calling `vendor/simai-m4/scripts/build.sh -c m4`. The vendor build script hardcodes
+`CC=gcc-9`/`CXX=g++-9`; if those aren't installed, the script creates temporary symlinks
+pointing to the available `gcc`/`g++` so cmake succeeds.
 
 ### Binary Compilation (upstream scripts)
 
@@ -440,7 +453,11 @@ running `uv build --wheel`. The source file is not committed — it's a transien
 2. **build-analytical**: manylinux2014 Docker, applies path patches, CMake, caches by submodule commit
 3. **build-ns3**: manylinux2014 Docker, installs libxml2/sqlite/gsl, builds NS-3 debug + MTP,
    strips symbols, bundles `libns3*.so` shared libraries, caches by submodule commit
-4. **build-wheel**: Downloads binaries from artifacts, patches version (dev only), `uv build --wheel`, enforces <100MB PyPI limit
+4. **build-m4**: Ubuntu runner (not manylinux), installs CPU-only LibTorch 2.2.2 to `/opt/libtorch`,
+   sets `LIBTORCH_DIR`, calls `vendor/simai-m4/scripts/build.sh -c m4`. Runs on version
+   change, `force`, or `is_dev`. **Must not use CUDA LibTorch** (binary would link CUDA .so
+   files, failing on machines without GPU drivers).
+5. **build-wheel**: Downloads binaries from artifacts, patches version (dev only), `uv build --wheel`, enforces <100MB PyPI limit
 5. **release**: Creates git tag `v<version>`, GitHub release with wheel attached *(main only)*
 6. **publish-pypi**: OIDC authentication, publishes to PyPI *(main only)*
 7. **publish-testpypi**: OIDC authentication, publishes to TestPyPI *(dev only)*
@@ -481,5 +498,5 @@ simai simulate ns3 -w workload_gpt175b.txt -n topology_h100_128gpu/ \
 
 ---
 
-**Last Updated**: 2026-02-13 | **Human reference**: [`README.md`](./README.md)
+**Last Updated**: 2026-02-16 | **Human reference**: [`README.md`](./README.md)
 
