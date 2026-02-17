@@ -30,7 +30,7 @@ AI training workload analysis. It provides:
 - **CLI**: `simai generate workload/topology`, `simai profile gpu`, `simai simulate analytical/ns3`
 - **Workload generation**: From ML framework configs (Megatron, DeepSpeed, DeepSeek)
 - **Topology generation**: For Spectrum-X, DCN+, AlibabaHPN datacenter architectures
-- **Two simulation backends**: Analytical (fast, bandwidth-based) and NS-3 (detailed, packet-level)
+- **Three simulation backends**: Analytical (fast, bandwidth-based), NS-3 (detailed, packet-level), and M4 (flow-level, ML-based gray failure)
 - **GPU profiling**: Measure actual kernel execution times for realistic simulations
 
 The wrapper abstracts complex manual setup from upstream SimAI (hardcoded paths, directory
@@ -116,6 +116,18 @@ For editable installs, resource discovery falls back to the `vendor/simai/` subm
 **`profile.py`**:
 - `gpu()`: Profile GPU kernels on real hardware. Requires PyTorch + CUDA.
 
+**`install.py`**:
+- `m4()`: Compile and install the `SimAI_m4` binary from source.
+  Source discovery order: (1) editable-install `vendor/simai-m4/`, (2) cached clone at
+  `~/.cache/simai/simai-m4/`, (3) auto-clone from `_M4_GIT_URL` on first run.
+  Accepts `--src` to override source path and `--git-url` to override the clone URL.
+  `--force` reinstalls even if the binary already exists.
+  `--n-flows-max N` (default `_N_FLOWS_MAX = 500_000`) patches `M4::n_flows_max` in
+  `M4.cc` before compilation via `_patch_n_flows_max()`. The upstream default (50 000)
+  is too low for large workloads and causes an out-of-range tensor index crash.
+  Places binary in `simai/_binaries/` next to the package so `find_binary()` picks it up.
+  Requires CUDA torch `>=2.4,<2.7` (or `LIBTORCH_DIR` set) and cmake/make/gcc.
+
 **`simulate.py`**:
 - `analytical()`: Fast bandwidth-based simulation. Accepts workload + topology dir.
   Overlap parameters: `--dp-overlap`, `--tp-overlap`, `--ep-overlap`, `--pp-overlap`.
@@ -163,6 +175,12 @@ For editable installs, resource discovery falls back to the `vendor/simai/` subm
 - Patches config at runtime to replace `/etc/astra-sim/simulation/` with relative paths
 - Creates dummy `flow1.txt`, `trace1.txt` inputs
 - Sets env vars for log level, NVLS, PXN flags
+
+**`m4.py`** - `run_m4()`:
+- `_find_m4_models()`: Locates bundled `.pt` model files (3-tier: `_vendor/m4_models/` → editable vendor path → `SIMAI_PATH`)
+- `_find_libtorch_lib_dir()`: Returns the torch lib dir for setting `LD_LIBRARY_PATH` at runtime
+- `_convert_topology()`: Converts topology file to m4 format (bandwidth → XGbps, latency → Xms). Handles both raw numeric values and pre-formatted unit strings (e.g. `7200Gbps`, `0.000025ms`)
+- Symlinks model files to the path the binary hardcodes relative to cwd, runs in a temp dir
 
 ---
 
@@ -222,7 +240,7 @@ Runs automatically during `hatch build` / `uv build`:
 
 ### Local Wheel Build (`scripts/build_wheel.sh`)
 
-Mirrors the CI pipeline. Builds missing binaries then calls `uv build --wheel`.
+Mirrors the CI pipeline for analytical+ns3 binaries. Builds missing binaries then calls `uv build --wheel`.
 
 ```bash
 # Full build: binaries (if missing) + wheel
@@ -238,11 +256,14 @@ Mirrors the CI pipeline. Builds missing binaries then calls `uv build --wheel`.
 rm -rf build/bin && ./scripts/build_wheel.sh --docker
 ```
 
-Binary detection: if `build/bin/SimAI_analytical` **and** `build/bin/SimAI_simulator` both
-exist the binary build is skipped automatically (no flag needed).
+Binary detection: if `build/bin/SimAI_analytical` and `build/bin/SimAI_simulator` both exist,
+the binary build is skipped automatically (no flag needed).
 
 Build tool priority: Docker (`quay.io/pypa/manylinux2014_x86_64`) if available, then native
 `cmake`/`make`.
+
+**Note**: `SimAI_m4` is NOT built by this script. It is compiled automatically by
+`hatch_build.py` at install time when `vendor/simai-m4/` is present (see below).
 
 ### Binary Compilation (upstream scripts)
 
@@ -445,6 +466,9 @@ running `uv build --wheel`. The source file is not committed — it's a transien
 6. **publish-pypi**: OIDC authentication, publishes to PyPI *(main only)*
 7. **publish-testpypi**: OIDC authentication, publishes to TestPyPI *(dev only)*
 
+**m4 binary is NOT built in CI and NOT built at wheel/install time.** It requires CUDA and
+is compiled on demand via `simai install m4` (see CLI below).
+
 Binaries are renamed during wheel build: `ns3.36.1-AstraSimNetwork-debug` → `SimAI_simulator`
 
 **One-time setup for `dev` branch**:
@@ -481,5 +505,5 @@ simai simulate ns3 -w workload_gpt175b.txt -n topology_h100_128gpu/ \
 
 ---
 
-**Last Updated**: 2026-02-13 | **Human reference**: [`README.md`](./README.md)
+**Last Updated**: 2026-02-17 (m4 install: --n-flows-max flag, _patch_n_flows_max(), default 500 000) | **Human reference**: [`README.md`](./README.md)
 

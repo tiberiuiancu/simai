@@ -10,44 +10,35 @@ from simai.backends.binary import run_binary
 BINARY_NAME = "SimAI_m4"
 
 
+_M4_MODELS_REL = (
+    "astra-sim-alibabacloud", "astra-sim", "network_frontend", "m4", "models"
+)
+_M4_CACHE_DIR = Path.home() / ".cache" / "simai" / "simai-m4"
+
+
 def _find_m4_models() -> Path | None:
-    """Find the bundled m4 .pt model files directory.
+    """Find the m4 .pt model files directory.
 
     Search order:
-    1. Vendored in wheel: simai/_vendor/m4_models/
+    1. Cache populated by `simai install m4`: ~/.cache/simai/simai-m4/...
     2. Editable install: vendor/simai-m4/...
     3. SIMAI_PATH env var
     """
-    # 1. Vendored in wheel
-    vendored = Path(__file__).resolve().parent.parent / "_vendor" / "m4_models"
-    if vendored.is_dir():
-        return vendored
+    # 1. Cache from `simai install m4`
+    cached = _M4_CACHE_DIR.joinpath(*_M4_MODELS_REL)
+    if cached.is_dir():
+        return cached
 
     # 2. Editable install: __file__ is src/simai/backends/m4.py → project root is 4 levels up
-    editable = (
-        Path(__file__).resolve().parent.parent.parent.parent
-        / "vendor"
-        / "simai-m4"
-        / "astra-sim-alibabacloud"
-        / "astra-sim"
-        / "network_frontend"
-        / "m4"
-        / "models"
-    )
+    editable = Path(__file__).resolve().parent.parent.parent.parent / "vendor" / "simai-m4"
+    editable = editable.joinpath(*_M4_MODELS_REL)
     if editable.is_dir():
         return editable
 
     # 3. SIMAI_PATH env var
     env_path = os.environ.get("SIMAI_PATH")
     if env_path:
-        candidate = (
-            Path(env_path)
-            / "astra-sim-alibabacloud"
-            / "astra-sim"
-            / "network_frontend"
-            / "m4"
-            / "models"
-        )
+        candidate = Path(env_path).joinpath(*_M4_MODELS_REL)
         if candidate.is_dir():
             return candidate
 
@@ -72,8 +63,10 @@ def _convert_topology(src: Path, dst: Path) -> None:
 
     Converts bandwidth from raw bps integers to XGbps strings, and
     latency from plain float seconds to Xms strings.
+    If the values already carry units (e.g. '7200Gbps', '0.025ms'), they are
+    passed through unchanged.
 
-    Format (lines 3+): src_node dst_node bw_bps latency_sec err_rate
+    Format (lines 3+): src_node dst_node bw_bps_or_Gbps latency_sec_or_ms err_rate
     """
     with open(src) as f:
         lines = f.readlines()
@@ -89,10 +82,19 @@ def _convert_topology(src: Path, dst: Path) -> None:
                 f.write(line)
                 continue
             src_node, dst_node = parts[0], parts[1]
-            bw_gbps = float(parts[2]) / 1e9
-            latency_ms = float(parts[3]) * 1e3
-            err_rate = parts[4]
-            f.write(f"{src_node} {dst_node} {bw_gbps:g}Gbps {latency_ms:g}ms {err_rate}\n")
+            bw_raw, lat_raw, err_rate = parts[2], parts[3], parts[4]
+
+            if bw_raw.lower().endswith("gbps"):
+                bw_out = bw_raw
+            else:
+                bw_out = f"{float(bw_raw) / 1e9:g}Gbps"
+
+            if lat_raw.lower().endswith("ms"):
+                lat_out = lat_raw
+            else:
+                lat_out = f"{float(lat_raw) * 1e3:g}ms"
+
+            f.write(f"{src_node} {dst_node} {bw_out} {lat_out} {err_rate}\n")
 
 
 def run_m4(
@@ -161,7 +163,16 @@ def run_m4(
             "-o", str(binary_output_dir),
         ]
 
-        run_binary(BINARY_NAME, args, cwd=tmpdir, env=env, verbose=verbose)
+        try:
+            run_binary(BINARY_NAME, args, cwd=tmpdir, env=env, verbose=verbose)
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                "SimAI_m4 binary not found.\n"
+                "Install it with:\n"
+                "  pip install \"simai[m4]\"   # if not already installed\n"
+                "  simai install m4\n"
+                "Or set SIMAI_BIN_PATH to the directory containing SimAI_m4."
+            )
 
         # Collect result files (prefer binary_output_dir, fall back to tmpdir)
         result_files = [
