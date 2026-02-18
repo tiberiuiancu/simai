@@ -130,6 +130,53 @@ simai simulate m4 \
     -o results/
 ```
 
+### 1b. Run a distributed training benchmark (AICB)
+
+For running actual collective operations across a real GPU cluster using AICB:
+
+```bash
+# Single-node smoke test (no SLURM needed)
+simai bench training \
+    --nproc-per-node 4 \
+    --world-size 4 \
+    --framework Megatron \
+    --num-layers 24 \
+    --hidden-size 1024 \
+    --num-heads 16 \
+    --global-batch-size 8 \
+    --micro-batch-size 1 \
+    --epochs 1 \
+    --output results/bench/
+```
+
+With a GPU compute profile for realistic AIOB compute-communication overlap:
+
+```bash
+simai bench training \
+    --nproc-per-node 4 --world-size 4 \
+    --num-layers 24 --hidden-size 1024 --num-heads 16 \
+    --global-batch-size 8 --micro-batch-size 1 \
+    --comp-profile h100_profile.txt \
+    --output results/bench/
+```
+
+**Multi-node SLURM** — SLURM env vars (`SLURM_NNODES`, `SLURM_NODEID`, `SLURM_GPUS_PER_NODE`,
+`MASTER_ADDR`, `MASTER_PORT`) are auto-detected, so each `srun` task needs no extra flags:
+
+```bash
+# Use the provided template (edit partition / model config as needed)
+sbatch tests/run_bench.slurm
+```
+
+Requirements:
+- PyTorch with CUDA: `pip install "simai[profiling]"`
+- CUDA-capable GPUs
+- AICB source (vendored in wheel, or set `SIMAI_PATH`)
+
+> **Note**: `simai bench training` runs actual NCCL collective operations on real GPUs.
+> This is different from `simai profile gpu` (single-GPU kernel timing, no communication)
+> and `simai simulate analytical/ns3` (software simulation, no GPU needed).
+
 ### Installing a dev version
 
 Dev builds are published to TestPyPI on every push to the `dev` branch:
