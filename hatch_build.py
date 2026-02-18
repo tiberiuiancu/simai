@@ -32,10 +32,9 @@ class CustomBuildHook(BuildHookInterface):
                 src = aicb_src / subdir
                 if src.is_dir():
                     shutil.copytree(src, aicb_dest / subdir, dirs_exist_ok=True)
-            # Also vendor the top-level entry point (needed by simai bench training)
-            aicb_py = aicb_src / "aicb.py"
-            if aicb_py.is_file():
-                shutil.copy2(aicb_py, aicb_dest / "aicb.py")
+            # Vendor all top-level .py modules (aicb.py, workload_applyer.py, etc.)
+            for py_file in aicb_src.glob("*.py"):
+                shutil.copy2(py_file, aicb_dest / py_file.name)
 
         # --- Vendor topology generator ---
         astrasim_src = Path(self.root) / "vendor" / "simai" / "astra-sim-alibabacloud"
