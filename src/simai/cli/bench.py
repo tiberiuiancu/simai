@@ -156,9 +156,9 @@ def training(
         ),
     ] = None,
     # --- Run config ---
-    epochs: Annotated[
+    iters: Annotated[
         int,
-        typer.Option("--epochs", help="Number of benchmark epochs/iterations."),
+        typer.Option("--iters", "--iterations", help="Number of benchmark epochs/iterations."),
     ] = 1,
     output: Annotated[
         Path,
@@ -218,7 +218,7 @@ def training(
             distributed_optimizer=distributed_optimizer,
             aiob_enable=effective_aiob,
             comp_filepath=str(comp_profile) if comp_profile is not None else None,
-            epochs=epochs,
+            epochs=iters,
             output_dir=output,
         )
     except FileNotFoundError as e:
