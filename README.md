@@ -23,6 +23,19 @@ pip install "simai[m4]"      # installs torch dependency
 simai install m4             # compiles SimAI_m4 binary (requires CUDA torch + cmake/make/gcc)
 ```
 
+For NVIDIA Apex (PyTorch CUDA extensions) and DeepGEMM (DeepSeek CUDA kernels):
+
+```bash
+simai install apex           # Installs NVIDIA/apex (for AICB profiling, optional)
+simai install deepgemm       # Installs DeepSeekAI/DeepGEMM (for DeepSeek models, optional)
+```
+
+> **Note**: If you see a RuntimeError about CUDA version mismatch when installing Apex, you can use:
+> ```bash
+> simai install apex --skip-cuda-version-check
+> ```
+> This will patch `setup.py` to skip the CUDA version check (at your own risk). See [discussion](https://github.com/NVIDIA/apex/pull/323#discussion_r287021798).
+
 > **Note**: The M4 binary (`SimAI_m4`) is **not** included in the PyPI wheel. Run
 > `simai install m4` to compile it from source (requires CUDA-enabled PyTorch and cmake/make/gcc).
 > On first run the source is cloned automatically from GitHub into `~/.cache/simai/simai-m4/`;

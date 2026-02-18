@@ -134,6 +134,8 @@ For editable installs, resource discovery falls back to the `vendor/simai/` subm
   is too low for large workloads and causes an out-of-range tensor index crash.
   Places binary in `simai/_binaries/` next to the package so `find_binary()` picks it up.
   Requires CUDA torch `>=2.4,<2.7` (or `LIBTORCH_DIR` set) and cmake/make/gcc.
+- `apex()`: Installs NVIDIA/apex (PyTorch CUDA extensions) from source. Clones to `~/.cache/simai/apex` by default. Accepts `--src` and `--git-url`. Use `--skip-cuda-version-check` to patch `setup.py` and skip the CUDA version check (see [discussion](https://github.com/NVIDIA/apex/pull/323#discussion_r287021798)).
+- `deepgemm()`: Installs DeepSeekAI/DeepGEMM (CUDA kernels for DeepSeek models) from source. Clones to `~/.cache/simai/DeepGEMM` by default. Accepts `--src` and `--git-url`.
 
 **`simulate.py`**:
 - `analytical()`: Fast bandwidth-based simulation. Accepts workload + topology dir.
