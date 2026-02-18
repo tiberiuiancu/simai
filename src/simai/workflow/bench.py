@@ -121,4 +121,16 @@ def run_training_benchmark(
 
     print(f"Running: {' '.join(cmd)}")
     result = subprocess.run(cmd, cwd=output_dir)
+
+    # AICB hardcodes output to results/mocked_workload/ relative to cwd.
+    # Move results to output_dir root.
+    if result.returncode == 0:
+        results_subdir = output_dir / "results" / "mocked_workload"
+        if results_subdir.is_dir():
+            for file in results_subdir.iterdir():
+                if file.is_file():
+                    shutil.move(str(file), str(output_dir / file.name))
+            # Clean up the empty results directory
+            shutil.rmtree(output_dir / "results")
+
     return result.returncode
